@@ -1,13 +1,16 @@
-# In this model , the autonomous mode could run at 18mph.
+# In this model , the autonomous mode could run at 15mph.
+print("begin to train")
+import csv
+# In this model , the autonomous mode could run at 15mph.
+
 import csv
 from pprint import pprint
 import cv2
 import numpy as np
 import sys
-import pickle
+import pickle 
 
 import tensorflow as tf
-
 print(tf.__version__)
 
 # from tensorflow.python.keras.models import Sequential
@@ -21,13 +24,12 @@ from keras.layers.convolutional import Conv2D
 from keras.layers.pooling import MaxPooling2D
 
 reload_all_data = True
-
+ 
 image_pickle_path = './image.piclke'
 measurements_pickle_path = './measurements.pickle'
 images = []
 measurements = []
-
-
+    
 def load_data():
     """
     load all data
@@ -44,19 +46,21 @@ def load_data():
         """
         fix left camera and right camera mesurement error
         """
-        mesurement = mesurement
-        if i is 1:  # left
-            mesurement = mesurement + 0.30
+        result = mesurement
+        if i is 1: # left 
+            result = mesurement + 0.30
 
-        if i is 2:  # right
-            mesurement = mesurement - 0.30
-        return mesurement
+        if i is 2: # right
+            result = mesurement - 0.30
+        return result
 
-    count = 0
+    
+    count=0
+    print(len(lines))
     for line in lines:
         for i in range(3):
             image_path = '/nfs/project/car/data/IMG/' + line[i].split('/')[-1]
-            image = cv2.imread(image_path)
+            image = cv2.imread(image_path, cv2.COLOR_BGR2RGB)
 
             # origin image
             images.append(image)
@@ -70,14 +74,20 @@ def load_data():
 
         count += 1
         if count % 300 == 0:
-            print("handle %d data. " % count)
-
-    with open(image_pickle_path, 'wb') as f:
-        pickle.dump(images, f)
-    with open(measurements_pickle_path, 'wb') as f:
-        pickle.dump(measurements, f)
-
-
+            print("handle %d data. "%count)
+# memory error when dump            
+#     try:
+#         with open(image_pickle_path, 'wb') as f:
+#             pickle.dump(images, f)
+#     except Exception as e:
+#         print(e)
+        
+#     try:
+#         with open(measurements_pickle_path, 'wb') as f:
+#             pickle.dump(measurements, f)
+#     except Exception as e:
+#         print(e)
+    
 if reload_all_data:
     load_data()
 else:
@@ -87,29 +97,35 @@ else:
         measurements = pickle.load(f)
 
 print("begin to reshape data")
-X_train = np.array(images)
+X_train = np.array(images)    
 
-print("train data size: ", X_train.shape)
+print("train data size: ",X_train.shape)
 y_train = np.array(measurements)
 
-print("Train image size:", len(images))
+print("Train image size:",len(images))
 
 model = Sequential()
-model.add(Lambda(lambda x: x / 255.0 - 0.5, input_shape=(160, 320, 3)))
-model.add(Cropping2D(cropping=((70, 25), (0, 0))))
-model.add(Conv2D(24, (5, 5), strides=(2, 2), activation="relu"))
-model.add(Conv2D(36, (5, 5), strides=(2, 2), activation="relu"))
-model.add(Conv2D(48, (5, 5), strides=(2, 2), activation="relu"))
+model.add(Lambda(lambda x: x/255.0 - 0.5, input_shape=(160,320,3))) # normalization
+model.add(Cropping2D(cropping=((70, 25), (0, 0))))# clip
+model.add(Conv2D(24, (5, 5), strides=(2,2), activation="relu"))
+model.add(Dropout(0.5))
+model.add(Conv2D(36, (5, 5), strides=(2,2), activation="relu"))
+model.add(Dropout(0.5))
+model.add(Conv2D(48, (5, 5), strides=(2,2), activation="relu"))
+model.add(Dropout(0.5))
 model.add(Conv2D(64, (3, 3), activation="relu"))
+model.add(Dropout(0.5))
 model.add(Conv2D(64, (3, 3), activation="relu"))
 model.add(Flatten())
-model.add(Dense(120))
-model.add(Dense(50))
-model.add(Dense(10))
+model.add(Dense(120, activation="relu"))
+model.add(Dropout(0.5))
+model.add(Dense(50, activation="relu"))
+model.add(Dropout(0.5))
+model.add(Dense(10, activation="relu"))
 model.add(Dense(1))
 model.compile(loss='mse', optimizer='adam')
 
-model.fit(x=X_train, y=y_train, validation_split=0.2, shuffle=True, epochs=7)
+model.fit(x=X_train, y=y_train, validation_split=0.1, shuffle=True, epochs=2)
 
 model.save('model.h5')
 
